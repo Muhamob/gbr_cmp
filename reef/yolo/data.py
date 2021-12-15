@@ -72,6 +72,7 @@ class LoadImagesAndLabels(Dataset):
             path: Union[str, Path],
             slice_height: int = 360,
             slice_width: int = 640,
+            overlap_threshold: float = 0.75,
             img_size: int = 640,
             batch_size: int = 16,
             augment: int = False,
@@ -87,9 +88,11 @@ class LoadImagesAndLabels(Dataset):
         # slicing
         self.slice_height = slice_height
         self.slice_width = slice_width
+        self.overlap_threshold = overlap_threshold
         self.slicer = Slicer(
             slice_height=self.slice_height,
             slice_width=self.slice_width,
+            overlap_threshold=self.overlap_threshold,
             random_state=random_state
         )
 
@@ -228,10 +231,13 @@ class Slicer:
             self,
             slice_width: int,
             slice_height: int,
+            overlap_threshold: float = 1.0,
             random_state: Optional[int] = None
     ):
         self.slice_width = slice_width
         self.slice_height = slice_height
+
+        self.overlap_threshold = overlap_threshold
 
         self.rs = np.random.RandomState(random_state)
 
@@ -304,6 +310,16 @@ class Slicer:
         x_min, y_min, x_max, y_max = box
         return image[y_min:y_max, x_min:x_max]
 
+    def calc_overlap(
+            self,
+            label: List[float]
+    ):
+        x_c, y_c, w, h = label
+        x_overlap = max(0, min(1, x_c + w / 2) - max(0, x_c - w / 2))
+        y_overlap = max(0, min(1, y_c + h / 2) - max(0, y_c - h / 2))
+
+        return x_overlap * y_overlap / (w * h)
+
     def transform_labels(
             self,
             labels: List[List],
@@ -326,8 +342,20 @@ class Slicer:
                 w / self.slice_width,
                 h / self.slice_height
             ]
-            if all(l > 0 for l in label[1:]):
-                result_labels.append(label)
+
+            # calc overlap ratio
+            overlap_ratio = self.calc_overlap(label[1:])
+            if overlap_ratio < self.overlap_threshold: continue
+
+            # check that center of box in image
+            is_box_center_in_image = (
+                (label[1] < 0 or label[1] > 1)
+                or
+                (label[2] < 0 or label[2] > 1)
+            )
+            if is_box_center_in_image: continue
+
+            result_labels.append(label)
 
         return result_labels
 
