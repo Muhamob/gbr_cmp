@@ -4,9 +4,11 @@ import matplotlib.pyplot as plt
 from matplotlib import patches
 from matplotlib.axes import Axes
 from matplotlib.figure import Figure
-from PIL import Image
+from PIL import Image, ImageDraw
 
 from copy import copy
+
+from ops import yolo2coco
 
 
 def add_bbox(
@@ -120,3 +122,19 @@ def plot_stack(
 
     plot_sample(ax, stacked_image, stacked_bbox)
     return fig, ax
+
+
+def plot_pil(img, labels):
+    color = (255, 0, 0)
+    img_np = img.numpy().astype("uint8").transpose([1, 2, 0])
+    img_height, img_width = img_np.shape[:2]
+    with Image.fromarray(img_np) as im:
+        draw = ImageDraw.Draw(im)
+        for label in labels:
+            label_yolo = yolo2coco(img_height, img_width, label)
+            x, y, width, height = label_yolo
+            print(label_yolo)
+            draw.line((x, y, x+width, y), fill=color, width=2)
+            draw.line((x+width, y, x+width, y+height), fill=color, width=2)
+            draw.line((x+width, y+height, x, y+height), fill=color, width=2)
+            draw.line((x, y+height, x, y), fill=color, width=2)
