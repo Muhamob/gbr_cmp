@@ -8,7 +8,7 @@ from PIL import Image, ImageDraw
 
 from copy import copy
 
-from ops import yolo2coco
+from reef.ops import yolo2coco
 
 
 def add_bbox(
@@ -138,3 +138,5 @@ def plot_pil(img, labels):
             draw.line((x+width, y, x+width, y+height), fill=color, width=2)
             draw.line((x+width, y+height, x, y+height), fill=color, width=2)
             draw.line((x, y+height, x, y), fill=color, width=2)
+
+    return im
