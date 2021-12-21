@@ -57,10 +57,13 @@ class YOLOModel(LightningModule):
         self.batch_size = 4
         self.accumulate = None
         self.nbs = 64
-        self.adam = False  #True
+        self.adam = False
+        self.warmup_epochs = -1
 
         self.compute_loss = None
         self.augment_test = False
+
+        self.save_hyperparameters()
 
     def configure_model(self):
         nl = self.model.model[-1].nl
@@ -78,6 +81,7 @@ class YOLOModel(LightningModule):
         self.nbs = params.get("nbs") or self.nbs
         self.accumulate = max(round(self.nbs / self.batch_size), 1)
         self.adam = params.get("adam") or self.adam
+        self.warmup_epochs = params.get("warmup_epochs") or self.warmup_epochs
 
         self.model.hyp['weight_decay'] *= self.batch_size * self.accumulate / self.nbs
 
@@ -137,14 +141,11 @@ class YOLOModel(LightningModule):
         self.compute_loss = ComputeLoss(self.model)
         return self
 
-    def triangular_fn(self, mid_epoch: int):
-        def f(epoch):
-            if epoch <= mid_epoch:
-                return 1.0 * epoch / mid_epoch
-            else:
-                return (1 - epoch / (self.trainer.max_epochs - 1)) * (1.0 - self.hyp['lrf']) + self.hyp['lrf']
-
-        return f
+    def triangular_fn(self, epoch: int):
+        if epoch <= self.warmup_epochs:
+            return 1.0 * epoch / self.warmup_epochs
+        else:
+            return (1 - epoch / (self.trainer.max_epochs - 1)) * (1.0 - self.hyp['lrf']) + self.hyp['lrf'] 
 
     def configure_optimizers(self):
         optimizer_param_groups = defaultdict(list)
@@ -180,7 +181,7 @@ class YOLOModel(LightningModule):
 
         return {
             "optimizer": optimizer,
-            "lr_scheduler": LambdaLR(optimizer, self.triangular_fn(mid_epoch=3))
+            "lr_scheduler": LambdaLR(optimizer, self.triangular_fn)
         }
 
     def train_dataloader(self) -> TRAIN_DATALOADERS:

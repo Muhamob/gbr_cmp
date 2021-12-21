@@ -17,8 +17,9 @@ from utils.autoanchor import check_anchors
 @click.command()
 @click.option("--data-path", help="Path to dataset split directory", type=click.Path())
 @click.option("--max-epochs", help="Maximum number of epochs to run", type=int)
-@click.option("--num-processes", help="NUmber of processes to run. If greater than 1, then ddp mode is used", type=int)
-def main(data_path: str, max_epochs: int, num_processes: int):
+@click.option("--num-processes", help="Number of processes to run. If greater than 1, then ddp mode is used", type=int)
+@click.option("--warmup-epochs", help="Number of epochs to warmup", type=int)
+def main(data_path: str, max_epochs: int, num_processes: int, warmup_epochs: int):
     SLICE_HEIGHT = 360
     SLICE_WIDTH = 640
     IMG_SIZE = 640
@@ -53,7 +54,7 @@ def main(data_path: str, max_epochs: int, num_processes: int):
             stride=STRIDE,
             dataset_params=dataset_params
         )
-        .load_train_params(batch_size=4, nbs=64)
+        .load_train_params(batch_size=4, nbs=64, warmup_epochs=warmup_epochs)
         .configure_loss()
     )
     module.setup("fit")
@@ -71,7 +72,7 @@ def main(data_path: str, max_epochs: int, num_processes: int):
 
     trainer = pl.Trainer(
         max_epochs=max_epochs,
-        max_time={"hours": 12},
+        max_time={"hours": 10},
         check_val_every_n_epoch=2,
         num_processes=num_processes,
         accumulate_grad_batches=module.accumulate,

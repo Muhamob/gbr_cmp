@@ -3,3 +3,5 @@
 
 # model checkpoints files
 **/*.pt
+**/lightning_logs/
+**/*logs*
