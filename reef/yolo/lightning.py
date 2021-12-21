@@ -138,12 +138,11 @@ class YOLOModel(LightningModule):
         }
 
     def configure_loss(self):
-        self.compute_loss = ComputeLoss(self.model)
         return self
 
     def triangular_fn(self, epoch: int):
         if epoch <= self.warmup_epochs:
-            return 1.0 * epoch / self.warmup_epochs
+            return 0.1 + (1.0 - 0.1) * epoch / self.warmup_epochs
         else:
             return (1 - epoch / (self.trainer.max_epochs - 1)) * (1.0 - self.hyp['lrf']) + self.hyp['lrf'] 
 
@@ -220,6 +219,8 @@ class YOLOModel(LightningModule):
         )
 
     def setup(self, stage: Optional[str] = None) -> None:
+        self.compute_loss = ComputeLoss(self.model, self.device)
+
         if stage == 'fit':
             print("Stage:", stage)
             self.train_dataset = LoadImagesAndLabels(

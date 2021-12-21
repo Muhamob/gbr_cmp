@@ -8,8 +8,9 @@ from torch.utils.data import Dataset
 import numpy as np
 import cv2 as cv
 
+from reef.yolo.data.augmentation import Augmentations
 from reef.yolo.data.ops import read_labels, unnormalize, img2label_paths
-from utils.augmentations import Albumentations, random_perspective, augment_hsv, letterbox
+from utils.augmentations import random_perspective, augment_hsv, letterbox
 from utils.general import xywhn2xyxy, xyxy2xywhn
 
 IMG_FORMATS = ['bmp', 'jpg', 'jpeg', 'png', 'tif', 'tiff', 'dng', 'webp', 'mpo']  # acceptable image suffixes
@@ -55,7 +56,12 @@ class LoadImagesAndLabels(Dataset):
         self.augment = augment
         self.mosaic = self.augment  # load 4 images at a time into a mosaic (only during training)
         self.mosaic_border = [-img_size // 2, -img_size // 2]
-        self.albumentations = Albumentations() if augment else None
+        self.albumentations = Augmentations(
+            hyp=hyp,
+            slice_width=slice_width,
+            slice_height=slice_height,
+            random_state=random_state
+        ) if augment else None
 
         # Hyperparameters
         self.hyp = hyp
@@ -102,63 +108,15 @@ class LoadImagesAndLabels(Dataset):
         image, labels, box = self.slicer.slice_random(image, labels)
         labels = np.array(labels)
 
-        if len(labels):  # normalized xywh to pixel xyxy format
-            labels[:, 1:] = xywhn2xyxy(labels[:, 1:], self.slice_width, self.slice_height, padw=0, padh=0)
-
+        # augmentations
         if self.augment:
-            image, labels = random_perspective(
-                image,
-                labels,
-                degrees=self.hyp['degrees'],
-                translate=self.hyp['translate'],
-                scale=self.hyp['scale'],
-                shear=self.hyp['shear'],
-                perspective=self.hyp['perspective']
-            )
-
-        nl = len(labels)  # number of labels
-        if nl:
-            labels[:, 1:5] = xyxy2xywhn(
-                labels[:, 1:5],
-                w=image.shape[1],
-                h=image.shape[0],
-                clip=True,
-                eps=1E-3
-            )
-
-        if self.augment:
-            # Albumentations
             image, labels = self.albumentations(image, labels)
-            nl = len(labels)  # update after albumentations
-
-            # HSV color-space
-            augment_hsv(
-                image,
-                hgain=self.hyp['hsv_h'],
-                sgain=self.hyp['hsv_s'],
-                vgain=self.hyp['hsv_v']
-            )
-
-            # Flip up-down
-            if self.rs.random() < self.hyp['flipud']:
-                image = np.flipud(image)
-                if nl:
-                    labels[:, 2] = 1 - labels[:, 2]
-
-            # Flip left-right
-            if self.rs.random() < self.hyp['fliplr']:
-                image = np.fliplr(image)
-                if nl:
-                    labels[:, 1] = 1 - labels[:, 1]
-
-            # Cutouts
-            # labels = cutout(img, labels, p=0.5)
-            # nl = len(labels)  # update after cutout
 
         # Pad image to stride stride
         image, labels = self.filler.transform(image, labels)
         labels = np.array(labels)
 
+        nl = len(labels)
         labels_out = torch.zeros((nl, 6))
         if nl:
             labels_out[:, 1:] = torch.from_numpy(labels)
