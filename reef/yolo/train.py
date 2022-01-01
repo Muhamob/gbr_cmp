@@ -19,7 +19,8 @@ from utils.autoanchor import check_anchors
 @click.option("--max-epochs", help="Maximum number of epochs to run", type=int)
 @click.option("--num-processes", help="Number of processes to run. If greater than 1, then ddp mode is used", type=int)
 @click.option("--warmup-epochs", help="Number of epochs to warmup", type=int)
-def main(data_path: str, max_epochs: int, num_processes: int, warmup_epochs: int):
+@click.option("--weights", help="Path to pretrained weights", type=click.Path())
+def main(data_path: str, max_epochs: int, num_processes: int, warmup_epochs: int, weights: str):
     SLICE_HEIGHT = 360
     SLICE_WIDTH = 640
     IMG_SIZE = 640
@@ -46,7 +47,7 @@ def main(data_path: str, max_epochs: int, num_processes: int, warmup_epochs: int
     module = (
         YOLOModel
         .load_from_pretrained(
-            "../../../weights/yolov5s.pt",
+            weights,
             hyp=hyp,
             data=data,
             random_state=RANDOM_STATE,

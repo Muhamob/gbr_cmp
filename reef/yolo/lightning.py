@@ -16,7 +16,7 @@ from models.yolo import Model
 from utils.general import intersect_dicts
 
 # configure logging at the root level of lightning
-from utils.loss import ComputeLoss
+from utils.loss import YOLOLoss
 from reef.yolo.data.dataset import LoadImagesAndLabels
 
 LOGGER = logging.getLogger("pytorch_lightning")
@@ -219,7 +219,7 @@ class YOLOModel(LightningModule):
         )
 
     def setup(self, stage: Optional[str] = None) -> None:
-        self.compute_loss = ComputeLoss(self.model, self.device)
+        self.compute_loss = YOLOLoss(self.model, self.device)
 
         if stage == 'fit':
             print("Stage:", stage)
